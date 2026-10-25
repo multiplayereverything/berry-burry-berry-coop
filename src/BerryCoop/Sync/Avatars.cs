@@ -124,9 +124,25 @@ namespace BerryCoop
             return puppets.TryGetValue(id, out p) && p.Root ? p.Root.transform.position : (Vector3?)null;
         }
 
+        static float lastRescale;
+
+        // Re-measure while we stand still vertically, so a jump or the intro doesn't skew the avatars' size.
+        static void Rescale()
+        {
+            if (Time.unscaledTime - lastRescale < 2f || !Player.Singleton) return;
+            lastRescale = Time.unscaledTime;
+            Rigidbody body = Player.Singleton.GetComponent<Rigidbody>();
+            if (body && Mathf.Abs(body.linearVelocity.y) > 0.2f) return;
+            Vector3 scale = Vector3.one * (EyeHeight() / ModelEyeHeight);
+            foreach (Puppet p in puppets.Values) if (p.Root) p.Root.transform.localScale = scale;
+        }
+
+        public static float CurrentEyeHeight { get { return EyeHeight(); } }
+
         public static void LateUpdate()
         {
             if (puppets.Count == 0) return;
+            Rescale();
             float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
             Camera cam = Camera.main;
             foreach (Puppet p in puppets.Values)
@@ -167,6 +183,27 @@ namespace BerryCoop
             }
             if (fallback) return fallback;
             return new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default"));
+        }
+
+        static void IgnorePlayers(Collider avatar)
+        {
+            if (!Player.Singleton) return;
+            foreach (Collider c in Player.Singleton.GetComponentsInChildren<Collider>(true)) Physics.IgnoreCollision(avatar, c, true);
+            foreach (Puppet other in puppets.Values)
+                if (other.Root)
+                    foreach (Collider c in other.Root.GetComponentsInChildren<Collider>(true)) Physics.IgnoreCollision(avatar, c, true);
+        }
+
+        // Head centre (1.65) plus the eye offset (0.06) in the unscaled model.
+        const float ModelEyeHeight = 1.71f;
+
+        // Every player has the same body, so our own camera height above our feet is where other players' eyes are.
+        static float EyeHeight()
+        {
+            GameObject cam = Game.Camera;
+            if (!cam || !Player.Singleton) return ModelEyeHeight;
+            float h = cam.transform.position.y - Feet(Player.Singleton.transform).y;
+            return h > 0.5f && h < 5f ? h : ModelEyeHeight;
         }
 
         static Puppet Create(int id)
@@ -220,15 +257,25 @@ namespace BerryCoop
             Font f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (f) { label.font = f; labelGo.GetComponent<MeshRenderer>().material = f.material; }
 
-            var cap = root.AddComponent<CapsuleCollider>();
-            cap.center = new Vector3(0f, 0.9f, 0f);
-            cap.height = 1.9f;
-            cap.radius = 0.4f;
-            var rb = root.AddComponent<Rigidbody>();
-            rb.isKinematic = true;
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            // Only the host's copy is solid, so guests can nudge berries in the shared simulation. It never touches
+            // players: a kinematic body sliding into the player's rigidbody launches them through walls.
+            Rigidbody rb = null;
+            if (Session.IsHost)
+            {
+                var cap = root.AddComponent<CapsuleCollider>();
+                cap.center = new Vector3(0f, 0.9f, 0f);
+                cap.height = 1.9f;
+                cap.radius = 0.4f;
+                rb = root.AddComponent<Rigidbody>();
+                rb.isKinematic = true;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                IgnorePlayers(cap);
+            }
 
             NetLog.Info("avatar for " + label.text + " created (shader " + body.GetComponent<Renderer>().sharedMaterial.shader.name + ")");
+            float eyes = EyeHeight();
+            root.transform.localScale = Vector3.one * (eyes / ModelEyeHeight);
+            NetLog.Info("avatar eye height " + eyes.ToString("F2") + " m (scale " + (eyes / ModelEyeHeight).ToString("F2") + ")");
             return new Puppet { Id = id, Root = root, Head = head, Label = label, Body = rb };
         }
     }
