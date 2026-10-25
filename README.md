@@ -33,14 +33,15 @@ Press **F8** for the co-op window.
 | Thing | How |
 |---|---|
 | Money, star orbs, seeds, piggy bank | One wallet on the host; every player sees and spends it |
-| Coins in your pocket | Per player, banked into the shared wallet at bedtime (half if you fall in the hole) |
+| Coin pocket | Shared too: any coin anyone collects shows for everyone right away, banked into the wallet at bedtime |
 | Upgrades, shop purchases, plant tiers | Bought by anyone, paid from the wallet, applied for everyone |
-| Berries, coins, seeds, star orbs, tools, props, berry buddies, piñatas | Simulated on the host and mirrored; the player holding something simulates it locally |
+| Berries, coins, seeds, star orbs, tools, props, berry buddies, piñatas | Simulated on the host and mirrored (including whether each can be grabbed); the player holding something simulates it locally |
+| Joining | A "Syncing" screen covers the farm until the host's state arrives; the host resends everything every 5 s |
 | Picking up, throwing, kicking, vacuuming | Work on every object; ownership passes to whoever touches it |
 | Dirt patches, conveyors, trampolines, juicers | Placed and sold by anyone, same tiles for everyone |
 | Day timer, night, abilities, hole growth and movement | Host-driven, mirrored |
 | Walls, dig spots, radio, berry picker, slot machine | Actions are sent to the host and replayed for everyone |
-| End of day / next day | The host's bedtime ends the day for all; the host starts the next day, guests load the same save |
+| End of day / next day | Anyone going to bed ends the day for everyone; the host starts the next day, guests load the same save |
 
 Cutscenes and endings play for whoever triggers them and are not shared. Guests return to the menu when the host does.
 

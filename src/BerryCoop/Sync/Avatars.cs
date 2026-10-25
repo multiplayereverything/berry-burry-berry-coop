@@ -57,7 +57,22 @@ namespace BerryCoop
             float pitch = cam ? cam.transform.eulerAngles.x : 0f;
             byte flags = 0;
             if (GameManager.Singleton.gameState == GameManager.GameState.RoundOverShop) flags |= FlagInShop;
-            return new Packet(Msg.Player).Int(Session.Epoch).Int(id).Vec(t.position).Float(yaw).Float(pitch).Byte(flags);
+            return new Packet(Msg.Player).Int(Session.Epoch).Int(id).Vec(Feet(t)).Float(yaw).Float(pitch).Byte(flags);
+        }
+
+        // The player body hovers above the ground, so send where the feet touch it.
+        static Vector3 Feet(Transform player)
+        {
+            Vector3 best = player.position + Vector3.down * 1.5f;
+            float bestDist = 4f;
+            foreach (RaycastHit h in Physics.RaycastAll(player.position, Vector3.down, 4f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (h.transform.IsChildOf(player) || h.distance >= bestDist) continue;
+                if (h.rigidbody && !h.rigidbody.isKinematic) continue;
+                bestDist = h.distance;
+                best = h.point;
+            }
+            return best;
         }
 
         public static void SendLocalPose()
@@ -162,13 +177,13 @@ namespace BerryCoop
             GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             Object.Destroy(body.GetComponent<Collider>());
             body.transform.SetParent(root.transform, false);
-            body.transform.localPosition = new Vector3(0f, 0.95f, 0f);
+            body.transform.localPosition = new Vector3(0f, 0.85f, 0f);
             body.transform.localScale = new Vector3(0.8f, 0.85f, 0.8f);
             body.GetComponent<Renderer>().material = MakeMaterial(c);
 
             var head = new GameObject("Head").transform;
             head.SetParent(root.transform, false);
-            head.localPosition = new Vector3(0f, 1.75f, 0f);
+            head.localPosition = new Vector3(0f, 1.65f, 0f);
             GameObject skull = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             Object.Destroy(skull.GetComponent<Collider>());
             skull.transform.SetParent(head, false);
@@ -194,7 +209,7 @@ namespace BerryCoop
 
             var labelGo = new GameObject("Name");
             labelGo.transform.SetParent(root.transform, false);
-            labelGo.transform.localPosition = new Vector3(0f, 2.45f, 0f);
+            labelGo.transform.localPosition = new Vector3(0f, 2.35f, 0f);
             var label = labelGo.AddComponent<TextMesh>();
             label.text = Session.NameOf(id);
             label.anchor = TextAnchor.MiddleCenter;
@@ -206,7 +221,7 @@ namespace BerryCoop
             if (f) { label.font = f; labelGo.GetComponent<MeshRenderer>().material = f.material; }
 
             var cap = root.AddComponent<CapsuleCollider>();
-            cap.center = new Vector3(0f, 0.95f, 0f);
+            cap.center = new Vector3(0f, 0.9f, 0f);
             cap.height = 1.9f;
             cap.radius = 0.4f;
             var rb = root.AddComponent<Rigidbody>();

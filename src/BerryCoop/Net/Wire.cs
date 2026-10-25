@@ -11,7 +11,7 @@ namespace BerryCoop.Net
 {
     public enum Msg : byte
     {
-        Hello = 1, Welcome, Reject, PlayerJoin, PlayerLeave, World, SceneReady, RoundEnd, ToMenu, Ready, Toast, Ping, Pong, Bank,
+        Hello = 1, Welcome, Reject, PlayerJoin, PlayerLeave, World, SceneReady, RoundEnd, ToMenu, Ready, Toast, Ping, Pong, Bank, Slept,
         StaticMap = 20, Spawn, Despawn, Snap, Claim, Release, OwnState, Owner, Deny, Take, Grant,
         State = 40, Growers,
         Cmd = 50, Rpc, Build, Sell, Kick, PopGun, CmdDenied,

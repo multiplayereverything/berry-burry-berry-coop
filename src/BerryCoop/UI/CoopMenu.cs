@@ -81,6 +81,13 @@ namespace BerryCoop
         void OnGUI()
         {
             Styles();
+            if (Session.ShowSyncCover)
+            {
+                GUI.color = Color.black;
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(0, Screen.height / 2f - 30, Screen.width, 60), "Syncing with " + Session.HostName + "'s farm...", big);
+            }
             DrawToasts();
             DrawHudLine();
             if (Open) window = GUILayout.Window(0x0B3EC00, window, DrawWindow, "Berry Bury Berry Co-op " + Plugin.ModVersion, GUILayout.Width(470));

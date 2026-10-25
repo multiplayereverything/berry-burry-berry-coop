@@ -9,8 +9,8 @@ import struct
 import time
 
 GAME = "berrybury"
-VERSION = "0.1.0/1"
-TAG = "berrybury-1"
+VERSION = "0.1.1/2"
+TAG = "berrybury-2"
 
 
 def relay_join(host, port, code, version=VERSION, name="edge"):
@@ -42,7 +42,7 @@ def net_str(text):
 
 
 def hello(tag, name):
-    return frame(bytes([1]) + net_str(tag) + net_str("0.1.0") + net_str(name))
+    return frame(bytes([1]) + net_str(tag) + net_str("0.1.1") + net_str(name))
 
 
 def read_frame(s, timeout=8):

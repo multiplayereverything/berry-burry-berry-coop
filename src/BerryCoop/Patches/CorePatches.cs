@@ -102,19 +102,25 @@ namespace BerryCoop.Patches
         }
     }
 
-    // The wallet lives on the host. Guests only ever bank their pocket; everything else arrives in the mirror.
+    // The wallet and the coin pocket live on the host; the host banks the shared pocket when the day ends.
     [HarmonyPatch(typeof(PlayerStats), nameof(PlayerStats.IncreaseMoney_Banked))]
     static class BankPatch
     {
-        static bool Prefix(int _amount)
+        static bool Prefix()
         {
             if (!Session.IsGuest || !Session.GuestInWorld) return true;
-            if (Session.BankContext > 0 && Session.Replaying == 0)
-            {
-                Session.GuestBank(_amount);
-                try { HudManager.Singleton.PlayFeedback_MoneyBanked(); } catch { }
-            }
+            if (Session.BankContext > 0) { try { HudManager.Singleton.PlayFeedback_MoneyBanked(); } catch { } }
             return false;
+        }
+    }
+
+    // Anyone going to bed (the bed only appears at night) ends the day for everyone.
+    [HarmonyPatch(typeof(WorldUsable), nameof(WorldUsable.Bed_EndRound))]
+    static class BedPatch
+    {
+        static void Postfix()
+        {
+            if (Session.GuestLive) Session.SendToHost(new Packet(Msg.Slept).Int(Session.Epoch));
         }
     }
 

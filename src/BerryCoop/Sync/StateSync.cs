@@ -23,10 +23,10 @@ namespace BerryCoop
         static readonly List<Block> blocks = new List<Block>();
         static bool built;
 
-        // Per-player values that must never be overwritten by the host.
+        // Per-player values that must never be overwritten by the host. The coin pocket is shared like the wallet.
         static readonly HashSet<string> statsExcluded = new HashSet<string>
         {
-            "money_Held", "fellInHoleThisRound", "debugPuzzleSolveIndex",
+            "fellInHoleThisRound", "debugPuzzleSolveIndex",
         };
 
         static readonly string[] gameManagerFields =
@@ -160,6 +160,7 @@ namespace BerryCoop
         public static void GuestApplyState(Reader r)
         {
             if (r.Int() != Session.Epoch || !Session.GuestLive) return;
+            if (!Session.GuestSynced && !uncovering && Entities.MapApplied) { uncovering = true; Plugin.Instance.StartCoroutine(UncoverSoon()); }
             int nb = r.Int();
             for (int i = 0; i < nb; i++)
             {
@@ -184,6 +185,15 @@ namespace BerryCoop
                 transformTargets[i] = pos; transformRotTargets[i] = rot;
                 mirroredTransforms[i].localScale = scale;
             }
+        }
+
+        static bool uncovering;
+
+        static System.Collections.IEnumerator UncoverSoon()
+        {
+            yield return new WaitForSecondsRealtime(0.4f);
+            Session.GuestSynced = true;
+            uncovering = false;
         }
 
         public static void GuestLateUpdate()

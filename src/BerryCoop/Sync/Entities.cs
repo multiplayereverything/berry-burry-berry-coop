@@ -21,6 +21,7 @@ namespace BerryCoop
         public Vector3 SentPos;
         public Quaternion SentRot;
         public bool SentActive;
+        public bool SentColliders;
         public bool HasSent;
 
         public Vector3 TargetPos;
@@ -33,8 +34,25 @@ namespace BerryCoop
         public float IdleSince;
         public bool TakeRequested;
 
+        public Collider[] Colliders;
+
+        public bool CollidersOn
+        {
+            get
+            {
+                foreach (Collider c in Colliders) if (c && !c.isTrigger) return c.enabled;
+                return true;
+            }
+        }
+
+        public void SetColliders(bool on)
+        {
+            foreach (Collider c in Colliders) if (c) c.enabled = on;
+        }
+
         public void Bind()
         {
+            Colliders = GetComponentsInChildren<Collider>(true);
             Rb = GetComponent<Rigidbody>();
             Pick = GetComponent<PickUppable>();
             Suck = GetComponent<SuckUppables>();
@@ -75,6 +93,7 @@ namespace BerryCoop
             ById.Clear(); byKey.Clear(); All.Clear(); spawnQueue.Clear(); despawnQueue.Clear();
             prefabs = null;
             nextId = 1;
+            MapApplied = false;
         }
 
         // Scene objects exist on every machine, so both sides key them by hierarchy position.
@@ -235,16 +254,17 @@ namespace BerryCoop
                 if (!ne || ne.Id == 0) continue;
                 Transform t = ne.transform;
                 bool active = ne.gameObject.activeInHierarchy;
-                bool send = all || !ne.HasSent || active != ne.SentActive || ((ne.Id + snapTick) % 45 == 0);
+                bool colliders = ne.CollidersOn;
+                bool send = all || !ne.HasSent || active != ne.SentActive || colliders != ne.SentColliders || ((ne.Id + snapTick) % 45 == 0);
                 if (!send && active)
                     send = (t.position - ne.SentPos).sqrMagnitude > 0.0001f || Quaternion.Angle(t.rotation, ne.SentRot) > 0.75f;
                 if (!send) continue;
-                ne.SentPos = t.position; ne.SentRot = t.rotation; ne.SentActive = active; ne.HasSent = true;
+                ne.SentPos = t.position; ne.SentRot = t.rotation; ne.SentActive = active; ne.SentColliders = colliders; ne.HasSent = true;
                 entries.Add(ne);
             }
             var p = new Packet(Msg.Snap).Int(Session.Epoch).Int(entries.Count);
             foreach (var ne in entries)
-                p.Int(ne.Id).Byte((byte)(ne.gameObject.activeInHierarchy ? 1 : 0)).Vec(ne.transform.position).QuatSmall(ne.transform.rotation);
+                p.Int(ne.Id).Byte((byte)((ne.gameObject.activeInHierarchy ? 1 : 0) | (ne.CollidersOn ? 2 : 0))).Vec(ne.transform.position).QuatSmall(ne.transform.rotation);
             return p;
         }
 
@@ -294,8 +314,11 @@ namespace BerryCoop
             }
         }
 
+        public static bool MapApplied;
+
         static void ApplyStaticMap(Reader r)
         {
+            MapApplied = true;
             int n = r.Int();
             var keep = new HashSet<NetEntity>();
             for (int i = 0; i < n; i++)
@@ -389,10 +412,13 @@ namespace BerryCoop
             int n = r.Int();
             for (int i = 0; i < n; i++)
             {
-                int id = r.Int(); bool active = (r.Byte() & 1) != 0; Vector3 pos = r.Vec(); Quaternion rot = r.QuatSmall();
+                int id = r.Int(); byte flags = r.Byte(); Vector3 pos = r.Vec(); Quaternion rot = r.QuatSmall();
+                bool active = (flags & 1) != 0, colliders = (flags & 2) != 0;
                 NetEntity ne = Get(id);
                 if (!ne || ne.OwnedLocally) continue;
                 if (ne.gameObject.activeSelf != active) ne.gameObject.SetActive(active);
+                // Star orbs and void boxes switch collision on in physics code guests don't run; follow the host.
+                if (ne.CollidersOn != colliders) ne.SetColliders(colliders);
                 ne.TargetPos = pos; ne.TargetRot = rot;
                 if (!ne.HasTarget) { ne.transform.SetPositionAndRotation(pos, rot); ne.HasTarget = true; }
             }
@@ -585,7 +611,7 @@ namespace BerryCoop
             }
         }
 
-        // Coins and seeds: the host removes the object and credits the guest's pocket.
+        // Coins and seeds: the host removes the object and credits the shared pocket.
         public static void RequestTake(NetEntity ne, bool manual)
         {
             if (!ne || ne.TakeRequested || ne.Id == 0) return;
@@ -605,6 +631,7 @@ namespace BerryCoop
                 AudioManager.Singleton.PlayCoinPickUpSFX(s.transform.position);
                 Coin coin = s.GetComponent<Coin>();
                 coin.CalculateCoinValue();
+                PlayerStats.Singleton.IncreaseMoney_Held(coin.GetCoinValue());
                 peer.Conn.Send(new Packet(Msg.Grant).Byte(1).Int(coin.GetCoinValue()));
             }
             else if (s.identity == ItemIdentity.Seed)
@@ -627,9 +654,8 @@ namespace BerryCoop
             Vector3 at = Player.Singleton ? Player.Singleton.transform.position : Vector3.zero;
             if (kind == 1)
             {
-                Session.GrantContext++;
-                try { PlayerStats.Singleton.IncreaseMoney_Held(value); }
-                finally { Session.GrantContext--; }
+                // The coin went into the shared pocket on the host; this is only the pickup feedback.
+                HudManager.Singleton.PlayFeedback_MoneyHeldPickUp();
                 AudioManager.Singleton.PlayCoinPickUpSFX(at);
             }
             else if (kind == 2) HudManager.Singleton.PlayFeedback_SeedHeldPickUp();

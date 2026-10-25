@@ -65,12 +65,16 @@ namespace BerryCoop
         static volatile string connectError;
         static volatile TcpClient connected;
         static volatile string newRoomCode;
-        static float lastTick, lastStateTick, lastPoseTick, lastPing;
+        static float lastTick, lastStateTick, lastPoseTick, lastPing, lastFullSync;
 
         // Host: the scene is the game and the save is loaded; guests: our copy is loaded for the host's epoch.
         public static bool WorldLive { get { return IsHost ? HostWorldReady : GuestLive; } }
         public static bool GuestLive { get { return IsGuest && guestReadySent && Game.InGameScene; } }
         public static bool GuestInWorld { get { return IsGuest && guestSceneLoaded && Game.InGameScene; } }
+        // Guests see a "syncing" screen until the host's full state has landed, instead of their own copy of the farm.
+        public static bool GuestSynced;
+        static float guestSceneSince;
+        public static bool ShowSyncCover { get { return GuestInWorld && !GuestSynced && Time.unscaledTime - guestSceneSince < 30f; } }
         public static int PlayerCount { get { return Peers.Count + (Role == Role.None ? 0 : (IsHost ? 1 : 0)); } }
 
         public static string ProtocolTag { get { return Plugin.GameId + "-" + Plugin.WireVersion; } }
@@ -230,6 +234,8 @@ namespace BerryCoop
             else if (IsGuest)
             {
                 guestReadySent = false;
+                GuestSynced = false;
+                guestSceneSince = Time.unscaledTime;
                 guestSceneLoaded = game && pendingEpoch == Epoch && PendingWorldJson != null;
             }
         }
@@ -366,9 +372,12 @@ namespace BerryCoop
             if (now - lastStateTick >= 0.1f)
             {
                 lastStateTick = now;
-                Packet s = StateSync.BuildState(false);
-                if (s.Length > 13) BroadcastReady(s);
-                if (StateSync.AuxDue()) BroadcastReady(StateSync.BuildAux(false));
+                // Every 5 s the host resends everything, so anything that drifted on a guest is corrected.
+                bool full = now - lastFullSync >= 5f;
+                if (full) lastFullSync = now;
+                BroadcastReady(StateSync.BuildState(full));
+                if (full) BroadcastReady(StateSync.BuildAux(true));
+                else if (StateSync.AuxDue()) BroadcastReady(StateSync.BuildAux(false));
             }
             if (now - lastPoseTick >= 0.05f) { lastPoseTick = now; Avatars.SendLocalPose(); }
         }
@@ -410,6 +419,14 @@ namespace BerryCoop
                 case Msg.Ready:
                     p.WantsNextDay = r.Bool();
                     if (p.WantsNextDay) CoopMenu.Toast(p.Name + " is ready for the next day", 4f);
+                    break;
+                case Msg.Slept:
+                    if (r.Int() == Epoch && p.Ready && Game.InGameScene && GameManager.Singleton.gameState == GameManager.GameState.Playing)
+                    {
+                        CoopMenu.Toast(p.Name + " went to bed", 4f);
+                        VcrIntroManager.Singleton.PlayTapeWindDownSFX();
+                        GameManager.Singleton.ForceEndRound(true);
+                    }
                     break;
                 case Msg.Bank:
                     {
@@ -555,6 +572,8 @@ namespace BerryCoop
             guestSceneLoaded = false;
             if (!MenuToGameBridger.Singleton) { NetLog.Error("no MenuToGameBridger; cannot load the host's world"); return; }
             ApplyNgMods(mods);
+            // Guests skip the game's own wake-up step (the host starts the day), which is what stops the shop music.
+            try { if (AudioManager.Singleton) AudioManager.Singleton.StopShopMusic(); } catch { }
             MenuToGameBridger.Singleton.loadDataOnNextGameSceneLoad = true;
             MenuToGameBridger.Singleton.comingBackToMainMenuFromTrueEnding = false;
             Status = "Loading " + HostName + "'s farm...";
