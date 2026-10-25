@@ -32,3 +32,26 @@ Online through the Multiplayer Everything relay in tunnel mode (own TCP protocol
 - Coins on guests: pickup request to host, host removes coin and grants value to that guest's pocket.
 - Gameplay calls (shop buys, upgrades, build, sell, abilities, hole move, radio, walls, dig) are forwarded guest -> host, replayed host -> guest for visuals.
 - Round flow: host ends the round -> guests end theirs (bank pocket). Guests wait in the shop for the host's next-round JSON.
+
+## Verified (2026-10-25, two game copies on one PC, self-driving lab builds)
+- LAN direct and the local relay copy (tunnel mode, port 7799): handshake, host world load on the guest
+  (1190/1190 scene objects matched), shared wallet mirror, coin pickup through the host (pocket 0 -> 10),
+  grab/hold/throw with ownership handoff, sell + re-place a dirt patch, guest follows the host into the shop,
+  pocket banked at day end, guest upgrade and shop purchases charged to the shared wallet, next day loads on
+  both with identical stats, avatars render, host leaving drops the guest to the main menu.
+- Relay edge cases (tools/edge_test.py): wrong code, wrong version, other mod build, full room: all refused.
+- check_server.py against the local relay: known game PASS, tunnel room PASS (mods-info SKIP, expected locally).
+
+## Gotchas
+1. A Harmony prefix with `ref object __result` on a void method aborts the whole PatchAll: patch classes one by one.
+2. Upgrade buttons flagged DISABLED_DO_NOT_INCLUDE_IN_TREE throw a NullReferenceException in UnlockUpgrade, even
+   in the game's own save loader, so a save containing one never loads. The host refuses them and missing prereqs.
+3. New URP/Lit materials render nothing in this build (stripped variants); copy a material the game uses.
+4. Build spots register in BuildSpot.Start and appear as the yard grows; day 1 has one spot (the starter patch).
+5. Start-Process -ArgumentList splits paths with spaces; quote them yourself.
+6. Two copies of the game run side by side from the exe; both need Application.runInBackground.
+
+## Not verified
+- Play between two different networks / the central relay: the game id is not in mods-info yet.
+- Three or more real game copies at once (the full-room check used fake clients).
+- Cutscenes and endings are not synced by design.

@@ -129,16 +129,29 @@ namespace BerryCoop
 
         static Material MakeMaterial(Color c)
         {
-            if (!baseMaterial)
-            {
-                Shader s = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit")
-                        ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
-                baseMaterial = new Material(s);
-            }
+            if (!baseMaterial) baseMaterial = FindGameMaterial();
             var m = new Material(baseMaterial);
+            if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", null);
+            if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", null);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
             m.color = c;
             return m;
+        }
+
+        // A material the game already draws with, so its shader variants are in the build (fresh ones render nothing).
+        static Material FindGameMaterial()
+        {
+            Material fallback = null;
+            foreach (MeshRenderer r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                Material mat = r.sharedMaterial;
+                if (!mat || !mat.shader) continue;
+                string s = mat.shader.name;
+                if (s.Contains("Universal Render Pipeline/Lit") || s.Contains("Simple Lit")) return mat;
+                if (!fallback && mat.HasProperty("_BaseColor")) fallback = mat;
+            }
+            if (fallback) return fallback;
+            return new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default"));
         }
 
         static Puppet Create(int id)
@@ -200,7 +213,7 @@ namespace BerryCoop
             rb.isKinematic = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-            NetLog.Info("avatar for " + label.text + " created");
+            NetLog.Info("avatar for " + label.text + " created (shader " + body.GetComponent<Renderer>().sharedMaterial.shader.name + ")");
             return new Puppet { Id = id, Root = root, Head = head, Label = label, Body = rb };
         }
     }

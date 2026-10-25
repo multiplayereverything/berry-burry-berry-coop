@@ -379,7 +379,7 @@ namespace BerryCoop
             {
                 if (r.Type != Msg.Hello) { DropPeer(p, "bad handshake"); return; }
                 string proto = r.Str(), version = r.Str(), name = r.Str();
-                if (proto != ProtocolTag) { Reject(p, "Different co-op mod build (host has " + Plugin.ModVersion + ", you have " + version + ")"); return; }
+                if (proto != ProtocolTag) { Reject(p, "Different co-op mod build (host " + Plugin.ModVersion + " / " + ProtocolTag + ", you " + version + " / " + proto + "). Use the same mod build."); return; }
                 if (Peers.Count > Mathf.Clamp(Plugin.CfgMaxPlayers.Value, 2, 4) - 1) { Reject(p, "The farm is full"); return; }
                 p.Name = RelayLink.Clean(name, 24);
                 p.Welcomed = true;

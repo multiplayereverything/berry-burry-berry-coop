@@ -1,6 +1,6 @@
 # Starts a self-driving host and guest copy of the game on this PC and waits for both to finish.
 # Usage: powershell -File tools\lab.ps1 [-Online] [-Relay 127.0.0.1:7799] [-Minutes 6]
-param([switch]$Online, [string]$Relay = "", [int]$Minutes = 6)
+param([switch]$Online, [string]$Relay = "", [int]$Minutes = 6, [switch]$HostLeaves)
 
 $game = "F:\SteamLibrary\steamapps\common\BerryBerryBerry"
 $exe = Join-Path $game "BerryBerryBerryBerryBerryBerryBerryBerryBerry.exe"
@@ -31,5 +31,10 @@ while ((Get-Date) -lt $deadline) {
     if ($h.HasExited -or $g.HasExited) { "a game exited early"; break }
 }
 Start-Sleep -Seconds 2
+if ($HostLeaves -and -not $h.HasExited) {
+    Stop-Process -Id $h.Id -Force
+    "host closed; watching the guest for 10 s"
+    Start-Sleep -Seconds 10
+}
 foreach ($p in @($h, $g)) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 "logs: lab-$($h.Id).log lab-$($g.Id).log"
