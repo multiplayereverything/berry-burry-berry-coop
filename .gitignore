@@ -1,0 +1,9 @@
+.tools/
+toolkits/
+backups/
+bin/
+obj/
+dist/
+lab/
+*.user
+relay-test/games.json
