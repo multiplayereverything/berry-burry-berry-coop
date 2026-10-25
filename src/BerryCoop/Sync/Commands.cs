@@ -250,8 +250,9 @@ namespace BerryCoop
             if (d.Method.Name == "UnlockUpgrade")
             {
                 var b = ButtonArg(args);
-                if (!b || b.isUnlocked) return false;
+                if (!b || b.isUnlocked || b.DISABLED_DO_NOT_INCLUDE_IN_TREE) return false;
                 if (b.upgradeIdentity == UpgradeTreeIdentity.NextRoundButton) return false;
+                foreach (UpgradeTreeButton pre in b.preReqUpgrades) if (pre && !pre.isUnlocked) return false;
                 if (!b.CanAfford())
                 {
                     peer.Conn.Send(new Packet(Msg.CmdDenied).Str("Not enough in the shared wallet for that."));

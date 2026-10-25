@@ -283,9 +283,12 @@ namespace BerryCoop
         }
 
         // Next day: the host just saved; guests load the same save while the host reloads.
+        static int savedForEpoch = -1;
+
         public static void HostSavedForNextRound(string json)
         {
-            if (!IsHost) return;
+            if (!IsHost || savedForEpoch == Epoch) return;
+            savedForEpoch = Epoch;
             int next = Epoch + 1;
             foreach (Peer p in Peers.Values)
             {
@@ -544,6 +547,7 @@ namespace BerryCoop
 
         static void GuestLoadWorld(int epoch, string json, string mods)
         {
+            if (epoch == pendingEpoch && PendingWorldJson != null) return;
             Epoch = epoch;
             pendingEpoch = epoch;
             PendingWorldJson = json;

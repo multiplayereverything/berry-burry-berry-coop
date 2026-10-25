@@ -60,9 +60,19 @@ namespace BerryCoop
             Application.runInBackground = true;
             NetLog.Open(Path.Combine(Root, lab ? "lab-" + System.Diagnostics.Process.GetCurrentProcess().Id + ".log" : "coop.log"));
 
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
-            Patches.CommandPatches.Register(new Harmony(Guid + ".commands"));
-            Patches.GuardPatches.Register(new Harmony(Guid + ".guards"));
+            var harmony = new Harmony(Guid);
+            int ok = 0, failed = 0;
+            foreach (Type t in AccessTools.GetTypesFromAssembly(typeof(Plugin).Assembly))
+            {
+                if (t.GetCustomAttributes(typeof(HarmonyPatch), false).Length == 0) continue;
+                try { harmony.CreateClassProcessor(t).Patch(); ok++; }
+                catch (Exception e) { failed++; NetLog.Error("patch " + t.Name + " failed: " + e.Message); }
+            }
+            try { Patches.CommandPatches.Register(new Harmony(Guid + ".commands")); }
+            catch (Exception e) { failed++; NetLog.Error("command patches failed: " + e); }
+            try { Patches.GuardPatches.Register(new Harmony(Guid + ".guards")); }
+            catch (Exception e) { failed++; NetLog.Error("guard patches failed: " + e); }
+            NetLog.Info("patch classes: " + ok + " ok, " + failed + " failed");
 
             SceneManager.sceneLoaded += OnSceneLoaded;
             gameObject.AddComponent<CoopMenu>();

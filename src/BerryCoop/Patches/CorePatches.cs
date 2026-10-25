@@ -134,7 +134,7 @@ namespace BerryCoop.Patches
                 "SpendMoney", "IncreaseSeeds", "SpendSeeds", "IncreaseStarOrbs", "SpendStarOrbs", "AddMoneyToPiggyBank",
                 "AddToCultistTotalCount", "AddSpawnedButNotDepositedStarOrb", "RemoveOrbFromSpawnedButNotDeposited",
                 "IncreaseWallsBrokenStat", "UsedBerryBlitz_SetCooldownToMax", "UsedBigHole_SetCooldownToMax",
-                "RoundStarted_TickAbilityCooldownsByOne", "RollForSeedDrop",
+                "RoundStarted_TickAbilityCooldownsByOne",
             };
             foreach (string n in names)
             {
@@ -143,10 +143,16 @@ namespace BerryCoop.Patches
             }
         }
 
-        static bool Prefix(System.Reflection.MethodBase __originalMethod, ref object __result)
+        static bool Prefix() { return !Session.IsGuest || !Session.GuestInWorld; }
+    }
+
+    [HarmonyPatch(typeof(PlayerStats), nameof(PlayerStats.RollForSeedDrop))]
+    static class SeedRollPatch
+    {
+        static bool Prefix(ref bool __result)
         {
             if (!Session.IsGuest || !Session.GuestInWorld) return true;
-            if (__originalMethod.Name == "RollForSeedDrop") __result = false;
+            __result = false;
             return false;
         }
     }

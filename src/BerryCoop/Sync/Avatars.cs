@@ -97,6 +97,12 @@ namespace BerryCoop
             if (!p.HasTarget) { p.Root.transform.position = pos; p.HasTarget = true; }
         }
 
+        public static float YawOf(int id)
+        {
+            Puppet p;
+            return puppets.TryGetValue(id, out p) ? p.Yaw : 0f;
+        }
+
         public static Vector3? PositionOf(int id)
         {
             Puppet p;

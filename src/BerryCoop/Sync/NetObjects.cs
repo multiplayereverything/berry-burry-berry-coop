@@ -38,6 +38,18 @@ namespace BerryCoop
         {
             GameObject[] roots = scene.GetRootGameObjects();
             for (int i = 0; i < roots.Length; i++) Walk(roots[i].transform, "R" + i + ":" + roots[i].name);
+            // Buildables already in the scene (the starting dirt patch) get negative ids in hierarchy order.
+            int sceneId = 0;
+            foreach (var kv in objects)
+            {
+                var b = kv.Value as Buildable;
+                if (!b) continue;
+                GameObject root = b.transform.root.gameObject;
+                if (root.GetComponent<BuiltObject>()) continue;
+                var bo = root.AddComponent<BuiltObject>();
+                bo.Id = --sceneId;
+                built[bo.Id] = bo;
+            }
         }
 
         static void Walk(Transform t, string path)
