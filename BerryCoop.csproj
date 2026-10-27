@@ -8,11 +8,17 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <OutputPath>artifacts/build/</OutputPath>
     <NoWarn>CS0649;CS0169;CS0414;MSB3277</NoWarn>
     <GameDir Condition="'$(GameDir)' == ''">F:\SteamLibrary\steamapps\common\BerryBerryBerry</GameDir>
     <Managed>$(GameDir)\BerryBerryBerryBerryBerryBerryBerryBerryBerry_Data\Managed</Managed>
     <BepInExCore>$(GameDir)\BepInEx\core</BepInExCore>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

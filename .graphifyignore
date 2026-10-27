@@ -1,0 +1,11 @@
+artifacts/
+private/
+bin/
+obj/
+graphify-out/
+deps/
+lab/
+dist/
+backups/
+toolkits/
+.tools/
