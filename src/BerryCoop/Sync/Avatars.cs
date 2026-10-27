@@ -8,7 +8,7 @@ namespace BerryCoop
     // body, so a guest walking into berries pushes them in the simulation everyone sees.
     public static class Avatars
     {
-        const byte FlagInShop = 1;
+        const byte FlagInShop = 1, FlagPlaying = 2, FlagVacuum = 4, FlagSucking = 8;
 
         sealed class Puppet
         {
@@ -20,6 +20,9 @@ namespace BerryCoop
             public Vector3 Target;
             public float Yaw, Pitch;
             public bool HasTarget;
+            public byte Flags;
+            public GameObject Vacuum;
+            public ParticleSystem[] VacuumParticles;
         }
 
         static readonly Dictionary<int, Puppet> puppets = new Dictionary<int, Puppet>();
@@ -56,8 +59,13 @@ namespace BerryCoop
             float yaw = cam ? cam.transform.eulerAngles.y : t.eulerAngles.y;
             float pitch = cam ? cam.transform.eulerAngles.x : 0f;
             byte flags = 0;
-            if (GameManager.Singleton.gameState == GameManager.GameState.RoundOverShop) flags |= FlagInShop;
-            return new Packet(Msg.Player).Int(Session.Epoch).Int(id).Vec(Feet(t)).Float(yaw).Float(pitch).Byte(flags);
+            GameManager.GameState state = GameManager.Singleton.gameState;
+            if (state == GameManager.GameState.RoundOverShop) flags |= FlagInShop;
+            if (state == GameManager.GameState.Playing) flags |= FlagPlaying;
+            GameObject art = Game.VacuumArt;
+            if (art && art.activeInHierarchy) flags |= FlagVacuum;
+            if (Game.Grabber && Game.Grabber.vacuumisOn) flags |= FlagSucking;
+            return new Packet(Msg.Player).Int(Session.Epoch).Int(id).Vec(SentFeet(t)).Float(yaw).Float(pitch).Byte(flags);
         }
 
         // The player body hovers above the ground, so send where the feet touch it.
@@ -73,6 +81,18 @@ namespace BerryCoop
                 best = h.point;
             }
             return best;
+        }
+
+        static float hover = 1.5f;
+
+        // Learn how high the body hovers while standing, then subtract that, so jumps and falls show on others' screens.
+        static Vector3 SentFeet(Transform player)
+        {
+            Rigidbody body = player.GetComponent<Rigidbody>();
+            Vector3 ground = Feet(player);
+            float h = player.position.y - ground.y;
+            if ((!body || Mathf.Abs(body.linearVelocity.y) < 0.3f) && h > 0.3f && h < 3f) hover = Mathf.Lerp(hover, h, 0.2f);
+            return player.position + Vector3.down * hover;
         }
 
         public static void SendLocalPose()
@@ -106,10 +126,15 @@ namespace BerryCoop
         {
             Puppet p;
             if (!puppets.TryGetValue(id, out p) || !p.Root) puppets[id] = p = Create(id);
-            bool show = (flags & FlagInShop) == 0;
-            if (p.Root.activeSelf != show) p.Root.SetActive(show);
+            p.Flags = flags;
             p.Target = pos; p.Yaw = yaw; p.Pitch = pitch;
             if (!p.HasTarget) { p.Root.transform.position = pos; p.HasTarget = true; }
+        }
+
+        public static bool VacuumShown(int id)
+        {
+            Puppet p;
+            return puppets.TryGetValue(id, out p) && p.Vacuum && p.Vacuum.activeInHierarchy;
         }
 
         public static float YawOf(int id)
@@ -122,6 +147,57 @@ namespace BerryCoop
         {
             Puppet p;
             return puppets.TryGetValue(id, out p) && p.Root ? p.Root.transform.position : (Vector3?)null;
+        }
+
+        static void UpdateVacuum(Puppet p)
+        {
+            if (!p.Vacuum) return;
+            bool on = (p.Flags & FlagVacuum) != 0;
+            if (p.Vacuum.activeSelf != on) p.Vacuum.SetActive(on);
+            if (!on || p.VacuumParticles == null) return;
+            bool sucking = (p.Flags & FlagSucking) != 0;
+            foreach (ParticleSystem ps in p.VacuumParticles)
+            {
+                if (!ps) continue;
+                if (sucking && !ps.isPlaying) ps.Play();
+                else if (!sucking && ps.isPlaying) ps.Stop();
+            }
+        }
+
+        // A copy of the game's own first-person vacuum, held in the avatar's hand and aimed with its head.
+        static void AttachVacuum(Puppet p)
+        {
+            GameObject src = Game.VacuumArt;
+            if (!src) return;
+            GameObject copy = Object.Instantiate(src);
+            copy.name = "Vacuum";
+            copy.SetActive(true);
+            foreach (MonoBehaviour mb in copy.GetComponentsInChildren<MonoBehaviour>(true)) Object.Destroy(mb);
+            foreach (Collider c in copy.GetComponentsInChildren<Collider>(true)) Object.Destroy(c);
+            foreach (Transform t in copy.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 0;
+            copy.transform.SetParent(null, false);
+            copy.transform.localScale = Vector3.one;
+            Bounds b = new Bounds(copy.transform.position, Vector3.zero);
+            bool any = false;
+            foreach (Renderer r in copy.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r is ParticleSystemRenderer) continue;
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            float size = any ? Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z)) : 1f;
+            Vector3 centre = any ? copy.transform.InverseTransformPoint(b.center) : Vector3.zero;
+            var holder = new GameObject("VacuumHolder").transform;
+            holder.SetParent(p.Head, false);
+            holder.localPosition = new Vector3(0.38f, -0.55f, 0.35f);
+            copy.transform.SetParent(holder, false);
+            float scale = size > 0.0001f ? 0.85f / size : 1f;
+            copy.transform.localScale = Vector3.one * scale;
+            copy.transform.localRotation = Quaternion.identity;
+            copy.transform.localPosition = -centre * scale;
+            p.Vacuum = holder.gameObject;
+            p.VacuumParticles = copy.GetComponentsInChildren<ParticleSystem>(true);
+            foreach (ParticleSystem ps in p.VacuumParticles) ps.Stop();
+            p.Vacuum.SetActive(false);
         }
 
         static float lastRescale;
@@ -145,15 +221,22 @@ namespace BerryCoop
             Rescale();
             float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
             Camera cam = Camera.main;
+            // Only while both of us are actually playing: not during the VHS intro, cutscenes or the shop.
+            bool localPlaying = Game.InGameScene && GameManager.Singleton.gameState == GameManager.GameState.Playing;
             foreach (Puppet p in puppets.Values)
             {
-                if (!p.Root || !p.HasTarget) continue;
+                if (!p.Root) continue;
+                bool show = localPlaying && (p.Flags & FlagPlaying) != 0;
+                if (p.Root.activeSelf != show) p.Root.SetActive(show);
+                if (!show || !p.HasTarget) continue;
+                UpdateVacuum(p);
                 Transform t = p.Root.transform;
                 Vector3 next = (t.position - p.Target).sqrMagnitude > 64f ? p.Target : Vector3.Lerp(t.position, p.Target, k);
                 Quaternion rot = Quaternion.Slerp(t.rotation, Quaternion.Euler(0f, p.Yaw, 0f), k);
                 if (p.Body) { p.Body.MovePosition(next); p.Body.MoveRotation(rot); }
                 else t.SetPositionAndRotation(next, rot);
                 if (p.Head) p.Head.localRotation = Quaternion.Euler(Mathf.DeltaAngle(0f, p.Pitch) * 0.6f, 0f, 0f);
+                if (p.Vacuum) p.Vacuum.transform.localRotation = Quaternion.Euler(Mathf.DeltaAngle(0f, p.Pitch) * 0.4f, 0f, 0f);
                 if (p.Label && cam) p.Label.transform.rotation = Quaternion.LookRotation(p.Label.transform.position - cam.transform.position);
             }
         }
@@ -273,10 +356,12 @@ namespace BerryCoop
             }
 
             NetLog.Info("avatar for " + label.text + " created (shader " + body.GetComponent<Renderer>().sharedMaterial.shader.name + ")");
+            var puppet = new Puppet { Id = id, Root = root, Head = head, Label = label, Body = rb };
+            try { AttachVacuum(puppet); } catch (System.Exception e) { NetLog.Warn("avatar vacuum: " + e.Message); }
             float eyes = EyeHeight();
             root.transform.localScale = Vector3.one * (eyes / ModelEyeHeight);
-            NetLog.Info("avatar eye height " + eyes.ToString("F2") + " m (scale " + (eyes / ModelEyeHeight).ToString("F2") + ")");
-            return new Puppet { Id = id, Root = root, Head = head, Label = label, Body = rb };
+            NetLog.Info("avatar eye height " + eyes.ToString("F2") + " m (scale " + (eyes / ModelEyeHeight).ToString("F2") + "), vacuum model " + (puppet.Vacuum ? "attached" : "missing"));
+            return puppet;
         }
     }
 }

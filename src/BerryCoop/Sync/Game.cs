@@ -23,6 +23,10 @@ namespace BerryCoop
         static readonly AccessTools.FieldRef<BerryGrower, float> growerMax = AccessTools.FieldRefAccess<BerryGrower, float>("growTimeMax");
         static readonly AccessTools.FieldRef<BerryGrower, GameObject> growerGrowingPrefab = AccessTools.FieldRefAccess<BerryGrower, GameObject>("growingBerryPrefab");
 
+        static readonly AccessTools.FieldRef<PlayerGrabber, GameObject> vacArt = AccessTools.FieldRefAccess<PlayerGrabber, GameObject>("vacuumArt");
+
+        public static GameObject VacuumArt { get { var g = Grabber; return g ? vacArt(g) : null; } }
+
         static PlayerGrabber grabber;
 
         public static PlayerGrabber Grabber

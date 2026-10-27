@@ -93,7 +93,7 @@ namespace BerryCoop.Patches
     {
         static void Prefix() { if (Session.IsGuest) Session.BankContext++; }
 
-        static void Postfix() { if (Session.IsHost) Session.HostRoundEnded(); }
+        static void Postfix(bool _fromBed) { if (Session.IsHost) Session.HostRoundEnded(_fromBed); }
 
         static Exception Finalizer(Exception __exception)
         {
@@ -111,6 +111,16 @@ namespace BerryCoop.Patches
             if (!Session.IsGuest || !Session.GuestInWorld) return true;
             if (Session.BankContext > 0) { try { HudManager.Singleton.PlayFeedback_MoneyBanked(); } catch { } }
             return false;
+        }
+    }
+
+    // A guest falling into the hole ends the day for everyone, the same as the host falling in.
+    [HarmonyPatch(typeof(Player), "FellIntoHole")]
+    static class FellPatch
+    {
+        static void Postfix()
+        {
+            if (Session.GuestLive) Session.SendToHost(new Packet(Msg.Fell).Int(Session.Epoch));
         }
     }
 

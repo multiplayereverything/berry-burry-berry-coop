@@ -606,7 +606,7 @@ namespace BerryCoop
             {
                 if (!ne || ne.Owner != peer.Id) continue;
                 Vector3 pos = ne.transform.position;
-                if (pos.y < -20f || pos.y > 500f) pos = peer.LastPos + Vector3.up * 1.5f;
+                if (pos.y < -20f || pos.y > 500f || Mathf.Abs(pos.z) > 400f) pos = peer.LastPos + Vector3.up * 1.5f;
                 HostRelease(ne, pos, ne.transform.rotation, Vector3.zero, Vector3.zero, ReleaseReason.Idle);
             }
         }

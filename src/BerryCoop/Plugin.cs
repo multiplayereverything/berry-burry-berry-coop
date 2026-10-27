@@ -13,9 +13,9 @@ namespace BerryCoop
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "berrybury.coop";
-        public const string ModVersion = "0.1.1";
+        public const string ModVersion = "0.1.2";
         // Wire protocol revision; bump whenever a message layout changes.
-        public const int WireVersion = 2;
+        public const int WireVersion = 3;
         public const string GameId = "berrybury";
         public const string DefaultRelay = "195.60.166.57:25569";
         public const int DefaultPort = 27777;

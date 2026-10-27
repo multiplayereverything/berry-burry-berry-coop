@@ -74,7 +74,21 @@ namespace BerryCoop
         // Guests see a "syncing" screen until the host's full state has landed, instead of their own copy of the farm.
         public static bool GuestSynced;
         static float guestSceneSince;
-        public static bool ShowSyncCover { get { return GuestInWorld && !GuestSynced && Time.unscaledTime - guestSceneSince < 30f; } }
+        static bool guestSeenPlaying;
+        public static bool ShowSyncCover
+        {
+            get
+            {
+                if (!GuestInWorld || Time.unscaledTime - guestSceneSince > 30f) return false;
+                if (!guestSeenPlaying && GuestSynced && GameManager.Singleton.gameState != GameManager.GameState.Intro
+                    && GameManager.Singleton.gameState != GameManager.GameState.PreRoundSetup)
+                {
+                    guestSeenPlaying = true;
+                    NetLog.Info("sync cover lifted (" + (Time.unscaledTime - guestSceneSince).ToString("F1") + " s after load)");
+                }
+                return !guestSeenPlaying;
+            }
+        }
         public static int PlayerCount { get { return Peers.Count + (Role == Role.None ? 0 : (IsHost ? 1 : 0)); } }
 
         public static string ProtocolTag { get { return Plugin.GameId + "-" + Plugin.WireVersion; } }
@@ -235,6 +249,7 @@ namespace BerryCoop
             {
                 guestReadySent = false;
                 GuestSynced = false;
+                guestSeenPlaying = false;
                 guestSceneSince = Time.unscaledTime;
                 guestSceneLoaded = game && pendingEpoch == Epoch && PendingWorldJson != null;
             }
@@ -304,10 +319,10 @@ namespace BerryCoop
             }
         }
 
-        public static void HostRoundEnded()
+        public static void HostRoundEnded(bool fromBed)
         {
             if (!IsHost || !HostWorldReady) return;
-            BroadcastReady(new Packet(Msg.RoundEnd).Int(Epoch));
+            BroadcastReady(new Packet(Msg.RoundEnd).Int(Epoch).Bool(fromBed));
         }
 
         static void MakeReady(Peer p)
@@ -324,6 +339,7 @@ namespace BerryCoop
             if (Role == Role.None) return;
             float now = Time.unscaledTime;
             if (IsHost) HostUpdate(now); else GuestUpdate(now);
+            if (Role != Role.None) ShopScreens.Tick();
         }
 
         static void HostUpdate(float now)
@@ -426,6 +442,13 @@ namespace BerryCoop
                         CoopMenu.Toast(p.Name + " went to bed", 4f);
                         VcrIntroManager.Singleton.PlayTapeWindDownSFX();
                         GameManager.Singleton.ForceEndRound(true);
+                    }
+                    break;
+                case Msg.Fell:
+                    if (r.Int() == Epoch && p.Ready && Game.InGameScene && GameManager.Singleton.gameState == GameManager.GameState.Playing)
+                    {
+                        CoopMenu.Toast(p.Name + " fell into the hole", 4f);
+                        GameManager.Singleton.ForceEndRound(false);
                     }
                     break;
                 case Msg.Bank:
@@ -535,9 +558,12 @@ namespace BerryCoop
                         break;
                     }
                 case Msg.RoundEnd:
-                    if (r.Int() == Epoch && GuestLive && GameManager.Singleton.gameState == GameManager.GameState.Playing)
-                        GameManager.Singleton.ForceEndRound(true);
-                    break;
+                    {
+                        int epoch = r.Int(); bool fromBed = r.Bool();
+                        if (epoch == Epoch && GuestLive && GameManager.Singleton.gameState == GameManager.GameState.Playing)
+                            GameManager.Singleton.ForceEndRound(fromBed);
+                        break;
+                    }
                 case Msg.ToMenu:
                     {
                         string scene = r.Str();
@@ -559,6 +585,7 @@ namespace BerryCoop
                 case Msg.CmdDenied: CoopMenu.Toast(r.Str(), 3f); break;
                 case Msg.Player: Avatars.GuestReceivePose(r); break;
                 case Msg.Toast: CoopMenu.Toast(r.Str(), 4f); break;
+                case Msg.Fx: Effects.GuestPlay(r); break;
             }
         }
 
