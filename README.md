@@ -1,4 +1,7 @@
 # Berry Bury Berry Co-op
+Maintained by NickBin ([RealAnxiousGit](https://github.com/RealAnxiousGit)) and by [Multiplayer Everything](https://github.com/multiplayereverything).
+
+Questions, bugs, or looking for people to play with? Join the [Multiplayer Everything Discord](https://discord.com/invite/P2MSSUf5GX).
 
 Online and LAN co-op for Berry Bury Berry, as a BepInEx 5 plugin. Up to 4 players farm the host's save together:
 one shared wallet, one yard, everyone's berries, coins, upgrades and buildings in the same world.
